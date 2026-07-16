@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 const navItems = [
   { label: "Library", href: "/" },
@@ -45,6 +46,18 @@ const Navbar = () => {
               </Link>
             );
           })}
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="nav-btn">Sign In</button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="btn-primary">Sign Up</button>
+            </SignUpButton>
+          </Show>
+          
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </nav>
       </div>
     </header>
