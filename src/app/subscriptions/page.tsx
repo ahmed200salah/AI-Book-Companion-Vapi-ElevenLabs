@@ -1,6 +1,8 @@
 
+import { redirect } from "next/navigation";
+
 const page = () => {
-  return <main className="container wrapper">test</main>;
+  redirect("/");
 };
 
 export default page;

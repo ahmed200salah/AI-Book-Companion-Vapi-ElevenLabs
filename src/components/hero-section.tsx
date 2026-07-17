@@ -15,7 +15,7 @@ const HeroSection = () => {
             </Link>
           </div>
           <div className="library-hero-illustration-desktop">
-            <Image src="/assets/hero-illustration.png" alt="Library illustration" width={350} height={233} priority className="object-contain" />
+            <Image src="/assets/hero-illustration.png" alt="Library illustration" width={350} height={233} preload className="object-contain" />
           </div>
         </div>
       </div>

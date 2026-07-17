@@ -8,8 +8,8 @@ import { X, Upload, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 const formSchema = z.object({
-  pdf: z.any().refine((file) => file instanceof File, 'PDF is required'),
-  coverImage: z.any().optional(),
+  pdf: z.any().refine((file) => file instanceof File && file.type === 'application/pdf' && file.size <= 50 * 1024 * 1024, 'PDF required, max 50MB'),
+  coverImage: z.any().optional().refine((file) => !file || (file instanceof File && file.type.startsWith('image/')), 'Must be an image'),
   title: z.string().min(1, 'Title is required'),
   author: z.string().min(1, 'Author is required'),
   voice: z.string().min(1, 'Voice is required'),
@@ -27,8 +27,24 @@ const UploadForm = () => {
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsLoading(false);
+    const formData = new FormData();
+    formData.append('pdf', data.pdf);
+    formData.append('title', data.title);
+    formData.append('author', data.author);
+    formData.append('voice', data.voice);
+    if (data.coverImage) formData.append('coverImage', data.coverImage);
+
+    try {
+      const response = await fetch('/api/books/new', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Failed to create book');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const maleVoices = ['Dave', 'Daniel', 'Chris'];
@@ -49,33 +65,38 @@ const UploadForm = () => {
         {/* PDF Upload */}
         <div className="space-y-2">
           <label className="form-label">Upload Book PDF</label>
-          {pdfFile ? (
-            <div className="upload-dropzone upload-dropzone-uploaded">
-              <span className="upload-dropzone-text">{pdfFile.name}</span>
-              <button type="button" className="upload-dropzone-remove" onClick={() => {setPdfFile(null); form.setValue('pdf', null)}}>
-                <X className="size-5" />
+          <div aria-describedby="pdf-error">
+            {pdfFile ? (
+              <div className="upload-dropzone upload-dropzone-uploaded">
+                <span className="upload-dropzone-text">{pdfFile.name}</span>
+                <button type="button" className="upload-dropzone-remove" onClick={() => {setPdfFile(null); form.setValue('pdf', null)}}>
+                  <X className="size-5" />
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="upload-dropzone border-2 border-dashed border-gray-200 w-full" onClick={() => document.getElementById('pdf-input')?.click()}>
+                <Upload className="upload-dropzone-icon" />
+                <span className="upload-dropzone-text">Click to upload PDF</span>
+                <span className="upload-dropzone-hint">PDF file (max 50MB)</span>
+                <input id="pdf-input" type="file" accept="application/pdf" className="hidden" onChange={(e) => {setPdfFile(e.target.files?.[0] || null); form.setValue('pdf', e.target.files?.[0])}} />
               </button>
-            </div>
-          ) : (
-            <div className="upload-dropzone border-2 border-dashed border-gray-200" onClick={() => document.getElementById('pdf-input')?.click()}>
-              <Upload className="upload-dropzone-icon" />
-              <span className="upload-dropzone-text">Click to upload PDF</span>
-              <span className="upload-dropzone-hint">PDF file (max 50MB)</span>
-              <input id="pdf-input" type="file" className="hidden" onChange={(e) => {setPdfFile(e.target.files?.[0] || null); form.setValue('pdf', e.target.files?.[0])}} />
-            </div>
-          )}
+            )}
+          </div>
+          {form.formState.errors.pdf && <p id="pdf-error" className="text-red-500 text-xs">{form.formState.errors.pdf.message as string}</p>}
         </div>
 
         {/* Title */}
         <div className="space-y-2">
           <label className="form-label">Title</label>
-          <input {...form.register('title')} className="form-input" placeholder="ex: Rich Dad Poor Dad" />
+          <input {...form.register('title')} aria-describedby="title-error" className="form-input" placeholder="ex: Rich Dad Poor Dad" />
+          {form.formState.errors.title && <p id="title-error" className="text-red-500 text-xs">{form.formState.errors.title.message}</p>}
         </div>
 
         {/* Author */}
         <div className="space-y-2">
           <label className="form-label">Author Name</label>
-          <input {...form.register('author')} className="form-input" placeholder="ex: Robert Kiyosaki" />
+          <input {...form.register('author')} aria-describedby="author-error" className="form-input" placeholder="ex: Robert Kiyosaki" />
+          {form.formState.errors.author && <p id="author-error" className="text-red-500 text-xs">{form.formState.errors.author.message}</p>}
         </div>
 
         {/* Voice Selector */}
@@ -110,21 +131,24 @@ const UploadForm = () => {
         {/* Cover Image */}
         <div className="space-y-2">
           <label className="form-label">Upload Book Cover Image</label>
-          {coverFile ? (
-            <div className="upload-dropzone upload-dropzone-uploaded">
-              <span className="upload-dropzone-text">{coverFile.name}</span>
-              <button type="button" className="upload-dropzone-remove" onClick={() => {setCoverFile(null); form.setValue('coverImage', null)}}>
-                <X className="size-5" />
+          <div aria-describedby="cover-error">
+            {coverFile ? (
+              <div className="upload-dropzone upload-dropzone-uploaded">
+                <span className="upload-dropzone-text">{coverFile.name}</span>
+                <button type="button" className="upload-dropzone-remove" onClick={() => {setCoverFile(null); form.setValue('coverImage', null)}}>
+                  <X className="size-5" />
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="upload-dropzone border-2 border-dashed border-gray-200 w-full" onClick={() => document.getElementById('cover-input')?.click()}>
+                <ImageIcon className="upload-dropzone-icon" />
+                <span className="upload-dropzone-text">Click to upload cover image</span>
+                <span className="upload-dropzone-hint">Leave empty to auto-generate from PDF</span>
+                <input id="cover-input" type="file" accept="image/*" className="hidden" onChange={(e) => {setCoverFile(e.target.files?.[0] || null); form.setValue('coverImage', e.target.files?.[0])}} />
               </button>
-            </div>
-          ) : (
-            <div className="upload-dropzone border-2 border-dashed border-gray-200" onClick={() => document.getElementById('cover-input')?.click()}>
-              <ImageIcon className="upload-dropzone-icon" />
-              <span className="upload-dropzone-text">Click to upload cover image</span>
-              <span className="upload-dropzone-hint">Leave empty to auto-generate from PDF</span>
-              <input id="cover-input" type="file" className="hidden" onChange={(e) => {setCoverFile(e.target.files?.[0] || null); form.setValue('coverImage', e.target.files?.[0])}} />
-            </div>
-          )}
+            )}
+          </div>
+          {form.formState.errors.coverImage && <p id="cover-error" className="text-red-500 text-xs">{form.formState.errors.coverImage.message as string}</p>}
         </div>
 
         <Button type="submit" className="form-btn">Begin Synthesis</Button>
